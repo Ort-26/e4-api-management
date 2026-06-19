@@ -10,6 +10,7 @@ export class TicketsController {
 
   getAllTickets = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      //TODO - Get credentials, if role = client use id to filter tickets by ownership, if role = agent / admin return all tickets
       const tickets = await this.ticketsService.getAllTickets();
       res.status(200).json(successResponse(tickets));
     } catch (error) {
@@ -63,4 +64,28 @@ export class TicketsController {
       next(appError);
     }
   };
+
+  getAvailableTransitions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ticketId = Number(req.params.ticketId);
+      // Placeholder for actual implementation
+      // Extract authUserId
+      // Service: check if user can view ticket by role/permission or by ownership, if not return 403
+      // Service: based on ctl_ticket_status_transitions and actual state get the available transitions, if no transitions available return empty array
+      const availableTransitions = [
+        { statusId: 2, statusName: 'In Progress' },
+        { statusId: 3, statusName: 'Resolved' },
+        { statusId: 4, statusName: 'Closed' },
+      ];
+      res.status(200).json(successResponse(availableTransitions));
+    } catch (error) {
+      const appError = new Error('Failed to retrieve available transitions') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-005';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  }
+
 }
