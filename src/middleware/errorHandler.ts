@@ -1,33 +1,60 @@
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../config';
+import { randomUUID } from 'crypto';
+import { ApiResponse } from '../models/envelope/api-response.type';
 
 export interface AppError extends Error {
   statusCode?: number;
+  errorCode?: string;
+  transactionId?: string;
 }
 
 export const errorHandler = (
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void => {
   const statusCode = err.statusCode ?? 500;
-  const message = err.message || 'Internal Server Error';
+  const errorCode = err.errorCode ?? `APP-${statusCode}`;
+  const transactionId = err.transactionId ?? randomUUID();
+  const safeMessage = 'An unexpected error occurred. Please contact support.';
 
-  res.status(statusCode).json({
-    success: false,
-    error: {
-      message,
-      ...(config.env === 'development' && { stack: err.stack }),
-    },
+  res.locals.errorMessage = `${errorCode}: ${safeMessage}`;
+
+  console.error('[error]', {
+    method: req.method,
+    path: req.originalUrl,
+    statusCode,
+    errorCode,
+    message: err.message,
+    stack: err.stack,
+    transactionId: transactionId,
   });
+
+  const response: ApiResponse<null> = {
+    meta: {
+      transactionId: transactionId,
+      timestamp: new Date().toISOString(),
+      message: safeMessage,
+      errorType: errorCode,
+    },
+    data: null,
+  };
+
+  res.status(statusCode).json(response);
 };
 
 export const notFoundHandler = (_req: Request, res: Response): void => {
-  res.status(404).json({
-    success: false,
-    error: {
-      message: 'Route not found',
+  const transactionId = randomUUID();
+  const response: ApiResponse<null> = {
+    meta: {
+      transactionId: transactionId,
+      timestamp: new Date().toISOString(),
+      message: 'Resource not found.',
+      errorType: 'APP-404',
     },
-  });
+    data: null,
+  };
+
+  res.status(404).json(response);
 };

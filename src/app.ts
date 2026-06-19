@@ -5,14 +5,23 @@ import { config } from './config';
 import { requestLogger } from './middleware/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import router from './routes';
+import cookieParser from 'cookie-parser';
 
 const app: Application = express();
 
 // Security headers
 app.use(helmet());
 
+// Cookie parser
+app.use(cookieParser());
+
 // CORS
-app.use(cors());
+app.use(cors({
+    origin: config.allowedOrigins,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: 'Content-Type,Authorization',
+  credentials: config.corsCredentials,
+  }));
 
 // Body parsers
 app.use(express.json());
