@@ -25,9 +25,13 @@ export class TicketInteractions {
             const authProfile = res.locals.authProfile;
             const userPermissions = await this.rolesRepository.getPermissionsByRoleId(authProfile.roleId) || [];
             const canInteract = userPermissions.some(permission => options.permissionIds.includes(permission.permissionId));
+            const idsPermissions = userPermissions.map(p => p.permissionId);
+            console.log(idsPermissions);
             if (!canInteract) {
                 return next(this.buildForbiddenError(res, this.defaultForbiddenMessage));
             }
+            // console.log(userPermissions);
+            console.log(canInteract);
             return next();
         }
     }
@@ -38,7 +42,7 @@ export class TicketInteractions {
             const authProfile = res.locals.authProfile;
             const userPermissions = await this.rolesRepository.getPermissionsByRoleId(authProfile.roleId) || [];
             const canInteract = userPermissions.some(permission => options.permissionIds.includes(permission.permissionId));
-            const ticketsByUser = await this.ticketsUsersRepository.getUsersByTicketId(authProfile.userId) || [];
+            const ticketsByUser = await this.ticketsUsersRepository.getUsersByTicketId(Number(req.params.ticketId)) || [];
             const isOwner = ticketsByUser.some(userId => userId === authProfile.userId);
             const ticketData = await this.ticketsRepository.getTicketById(Number(req.params.ticketId));
             if (!ticketData) return next(this.buildForbiddenError(res, this.defaultForbiddenMessage));

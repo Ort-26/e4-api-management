@@ -14,7 +14,11 @@ import { MasTicketModel } from '../../models/sequelize/MasTicketModel';
 import { MasTicketsCommentsModel } from '../../models/sequelize/MasTicketsCommentsModel';
 import { MasTicketsUsersModel } from '../../models/sequelize/MasTicketsUsersModel';
 import { MasUserModel } from '../../models/sequelize/MasUserModel';
+import { HisTicketStatusChangeModel } from '../../models/sequelize/HisTicketStatusChangeModel';
+import { HisAssignationChangeModel } from '../../models/sequelize/HisAssignationChangeModel';
 import { ITicketsRepository } from '../interfaces/ITicketsRepository';
+import { TransitionRes } from '../../models/response/TransitionRes';
+import { AssignRes } from '../../models/response/AssignRes';
 
 export class TicketsRepository implements ITicketsRepository {
   constructor() {
@@ -250,6 +254,149 @@ export class TicketsRepository implements ITicketsRepository {
       throw error;
     }
   }
+
+  async addCommentToTicket(ticketId: number, content: string, userId: number): Promise<MasComment> {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const now = new Date();
+      const commentRecord = await MasCommentModel.create(
+        {
+          content,
+          commentedBy: userId,
+          createdAt: now,
+          updatedAt: now,
+        },
+        { transaction },
+      );
+
+      await MasTicketsCommentsModel.create(
+        {
+          ticketId,
+          commentId: commentRecord.commentId,
+        },
+        { transaction },
+      );
+
+      await transaction.commit();
+
+      return commentRecord.get({ plain: true });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async transitionTicketStatus(ticketId: number, newStatusId: number, changedBy: number): Promise<{ ticketId: number; oldStatus: number; newStatus: number; updatedAt: Date }> {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const ticketRecord = await MasTicketModel.findOne({
+        where: { ticketId },
+        transaction,
+      });
+
+      if (!ticketRecord) {
+        throw new Error('TICKET_NOT_FOUND');
+      }
+
+      const oldStatus = ticketRecord.statusId;
+      const now = new Date();
+
+      ticketRecord.statusId = newStatusId;
+      ticketRecord.updatedAt = now;
+      await ticketRecord.save({ transaction });
+
+      await HisTicketStatusChangeModel.create(
+        {
+          ticketId,
+          oldStatus,
+          newStatus: newStatusId,
+          changedBy,
+          updatedAt: now,
+          statusId: newStatusId,
+        },
+        { transaction },
+      );
+
+      await transaction.commit();
+
+      return {
+        ticketId,
+        oldStatus,
+        newStatus: newStatusId,
+        updatedAt: now,
+      } as TransitionRes;
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
+  async assignAgentToTicket(ticketId: number, agentId: number, changedBy: number): Promise<AssignRes> {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const ticketRecord = await MasTicketModel.findOne({
+        where: { ticketId },
+        transaction,
+      });
+
+      if (!ticketRecord) {
+        throw new Error('TICKET_NOT_FOUND');
+      }
+
+      const agentRecord = await MasUserModel.findOne({
+        where: { userId: agentId },
+        include: [
+          {
+            model: CatRolesModel,
+            as: 'role',
+            required: false,
+          },
+        ],
+        transaction,
+      });
+
+      if (!agentRecord) {
+        throw new Error('AGENT_NOT_FOUND');
+      }
+
+      const plainAgent = agentRecord.get({ plain: true }) as MasUser & { role?: CatRole };
+      if (!plainAgent.role || plainAgent.role.roleName !== 'AGENT') {
+        throw new Error('INVALID_AGENT_ROLE');
+      }
+
+      const oldAgentId = ticketRecord.agentId;
+      const now = new Date();
+
+      ticketRecord.agentId = agentId;
+      ticketRecord.updatedAt = now;
+      await ticketRecord.save({ transaction });
+
+      await HisAssignationChangeModel.create(
+        {
+          ticketId,
+          oldUser: oldAgentId,
+          newUser: agentId,
+          changedBy,
+          updatedAt: now,
+        },
+        { transaction },
+      );
+
+      await transaction.commit();
+
+      return {
+        ticketId,
+        oldAgentId,
+        newAgentId: agentId,
+        updatedAt: now,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
 }
 
-export const ticketsRepository = new TicketsRepository();

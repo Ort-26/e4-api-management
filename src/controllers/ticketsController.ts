@@ -6,6 +6,7 @@ import { ITicketsService } from '../services/interfaces/ITicketsService';
 import { successResponse } from '../utils/metadataHelper';
 import { AuthTokenPayload } from '../models/dto/Auth.type';
 import { CatTicketStatuses } from '../models/domain/cat-ticket-statuses.type';
+import { TicketComment } from '../models/request/TicketComment.type';
 
 export class TicketsController {
   constructor(private readonly ticketsService: ITicketsService) {}
@@ -106,6 +107,115 @@ export class TicketsController {
       const appError = new Error('Failed to retrieve available transitions') as AppError;
       appError.statusCode = 500;
       appError.errorCode = 'APP-DB-005';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  }
+
+  addCommentToTicket = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ticketId = Number(req.params.ticketId);
+      const payload = req.body as TicketComment;
+      const authUserId = Number(res.locals.authUserId);
+
+      const comment = await this.ticketsService.addCommentToTicket(ticketId, payload.content, authUserId);
+
+      if (!comment) {
+        const appError = new Error('Ticket not found') as AppError;
+        appError.statusCode = 404;
+        appError.errorCode = 'APP-404';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      res.status(201).json(successResponse({
+        commentId: comment.commentId,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+      }));
+    } catch (error) {
+      const appError = new Error('Failed to create ticket comment') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-008';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  }
+
+  transitionTicket = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ticketId = Number(req.params.ticketId);
+      const statusId = Number(req.params.statusId);
+      const authProfile: AuthTokenPayload = res.locals.authProfile;
+
+      const transition = await this.ticketsService.transitionTicket(ticketId, statusId, authProfile);
+
+      if (!transition) {
+        const appError = new Error('Ticket not found') as AppError;
+        appError.statusCode = 404;
+        appError.errorCode = 'APP-404';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      res.status(200).json(successResponse(transition));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'INVALID_TRANSITION') {
+        const appError = new Error('Invalid ticket status transition for current user permissions') as AppError;
+        appError.statusCode = 409;
+        appError.errorCode = 'APP-BIZ-001';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      const appError = new Error('Failed to transition ticket status') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-009';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  }
+
+  assignAgentToTicket = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ticketId = Number(req.params.ticketId);
+      const agentId = Number(req.params.agentId);
+      const authProfile: AuthTokenPayload = res.locals.authProfile;
+
+      const assignment = await this.ticketsService.assignAgentToTicket(ticketId, agentId, authProfile);
+
+      if (!assignment) {
+        const appError = new Error('Ticket not found') as AppError;
+        appError.statusCode = 404;
+        appError.errorCode = 'APP-404';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      res.status(200).json(successResponse(assignment));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'AGENT_NOT_FOUND') {
+        const appError = new Error('Agent not found') as AppError;
+        appError.statusCode = 404;
+        appError.errorCode = 'APP-404';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      if (error instanceof Error && error.message === 'INVALID_AGENT_ROLE') {
+        const appError = new Error('Selected user is not an assignable agent') as AppError;
+        appError.statusCode = 409;
+        appError.errorCode = 'APP-BIZ-002';
+        appError.transactionId = res.locals.transactionId || randomUUID();
+        return next(appError);
+      }
+
+      const appError = new Error('Failed to assign agent to ticket') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-010';
       appError.transactionId = res.locals.transactionId || randomUUID();
       appError.stack = error instanceof Error ? error.stack : undefined;
       next(appError);

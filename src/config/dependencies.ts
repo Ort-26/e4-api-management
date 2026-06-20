@@ -1,5 +1,6 @@
 import { AuthController } from '../controllers/authController';
 import { CatalogsController } from '../controllers/catalogsController';
+import { MeController } from '../controllers/meController';
 import { TicketsController } from '../controllers/ticketsController';
 import { TicketInteractions } from '../middleware/permissions/canInteractWithTicket';
 import { AuthRepository } from '../repositories/impl/AuthRepository';
@@ -34,6 +35,7 @@ const controllers = {
   authController: new AuthController(services.authService),
   catalogsController: new CatalogsController(services.catalogsService),
   ticketsController: new TicketsController(services.ticketsService),
+  meController: new MeController(services.ticketsService),
 };
 
 const middlewares = {
