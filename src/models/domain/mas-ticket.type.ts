@@ -5,4 +5,5 @@ export interface MasTicket {
   createdAt: Date;
   updatedAt: Date;
   statusId: number;
+  agentId: number | null;
 }

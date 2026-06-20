@@ -18,3 +18,11 @@ export const validateTicketIdParam = [
     .isInt({ min: 1 }).withMessage('ticketId must be a positive integer').toInt(),
   validateRequest,
 ];
+
+export const validateTicketIdStatus = [
+  param('ticketId')
+    .isInt({ min: 1 }).withMessage('ticketId must be a positive integer').toInt(),
+  param('statusId')
+    .isInt({ min: 1 }).withMessage('statusId must be a positive integer').toInt(),
+  validateRequest,
+];

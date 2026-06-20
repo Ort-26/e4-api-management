@@ -12,13 +12,9 @@ export class AuthService implements IAuthService {
   constructor(private readonly authRepository: IAuthRepository) {}
 
   async login(payload: LoginRequest): Promise<AuthResult> {
-    
     const user = await this.authRepository.findUserByEmail(payload.email);
-
     if (!user) throw new Error('AUTH_INVALID_CREDENTIALS');
-
     await this.validatePassword(user, payload.password);
-
     return this.buildAuthResult(user);
   }
 
@@ -43,15 +39,7 @@ export class AuthService implements IAuthService {
     this.verifyToken(refreshToken, 'refresh');
   }
 
-  private async validatePassword(
-    user: AuthUserRecord,
-    password?: string,
-  ): Promise<void> {
-    if (!user.hashPassword) {
-      // Backward compatibility when DB has no hash_password column yet.
-      return;
-    }
-
+  private async validatePassword(user: AuthUserRecord,password?: string): Promise<void> {
     if (!password) {
       throw new Error('AUTH_INVALID_CREDENTIALS');
     }
@@ -64,21 +52,24 @@ export class AuthService implements IAuthService {
   }
 
   private buildAuthResult(user: AuthUserRecord): AuthResult {
-    const basePayload = {
+    const basePayload: AuthTokenPayload = {
       sub: String(user.userId),
       userId: user.userId,
+      userName: user.userName,
+      userLastname: user.userLastname,
       email: user.email,
       roleId: user.roleId,
+      tokenType: 'access',
     };
 
     const accessToken = jwt.sign(
-      { ...basePayload, tokenType: 'access' },
+      { ...basePayload, tokenType: 'access' } as AuthTokenPayload,
       config.auth.accessTokenSecret,
       { expiresIn: config.auth.accessTokenExpiresIn } as SignOptions,
     );
 
     const refreshToken = jwt.sign(
-      { ...basePayload, tokenType: 'refresh' },
+      { ...basePayload, tokenType: 'refresh' } as AuthTokenPayload,
       config.auth.refreshTokenSecret,
       { expiresIn: config.auth.refreshTokenExpiresIn } as SignOptions,
     );

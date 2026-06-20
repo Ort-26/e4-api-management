@@ -4,19 +4,50 @@ import { AppError } from '../middleware/errorHandler';
 import { CreateTicketRequest } from '../models/request/CreateTicketRequest.type';
 import { ITicketsService } from '../services/interfaces/ITicketsService';
 import { successResponse } from '../utils/metadataHelper';
+import { AuthTokenPayload } from '../models/dto/Auth.type';
+import { CatTicketStatuses } from '../models/domain/cat-ticket-statuses.type';
 
 export class TicketsController {
   constructor(private readonly ticketsService: ITicketsService) {}
 
   getAllTickets = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      //TODO - Get credentials, if role = client use id to filter tickets by ownership, if role = agent / admin return all tickets
       const tickets = await this.ticketsService.getAllTickets();
       res.status(200).json(successResponse(tickets));
     } catch (error) {
       const appError = new Error('Failed to retrieve tickets') as AppError;
       appError.statusCode = 500;
       appError.errorCode = 'APP-DB-002';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  };
+
+  getTicketsByUserId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = Number(req.params.userId);
+      const tickets = await this.ticketsService.getTicketsByUserId(userId);
+      res.status(200).json(successResponse(tickets));
+    } catch (error) {
+      const appError = new Error('Failed to retrieve tickets by user') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-006';
+      appError.transactionId = res.locals.transactionId || randomUUID();
+      appError.stack = error instanceof Error ? error.stack : undefined;
+      next(appError);
+    }
+  };
+
+  getTicketUserIds = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ticketId = Number(req.params.ticketId);
+      const userIds = await this.ticketsService.getUserIdsByTicketId(ticketId);
+      res.status(200).json(successResponse(userIds));
+    } catch (error) {
+      const appError = new Error('Failed to retrieve user ids by ticket') as AppError;
+      appError.statusCode = 500;
+      appError.errorCode = 'APP-DB-007';
       appError.transactionId = res.locals.transactionId || randomUUID();
       appError.stack = error instanceof Error ? error.stack : undefined;
       next(appError);
@@ -68,16 +99,9 @@ export class TicketsController {
   getAvailableTransitions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const ticketId = Number(req.params.ticketId);
-      // Placeholder for actual implementation
-      // Extract authUserId
-      // Service: check if user can view ticket by role/permission or by ownership, if not return 403
-      // Service: based on ctl_ticket_status_transitions and actual state get the available transitions, if no transitions available return empty array
-      const availableTransitions = [
-        { statusId: 2, statusName: 'In Progress' },
-        { statusId: 3, statusName: 'Resolved' },
-        { statusId: 4, statusName: 'Closed' },
-      ];
-      res.status(200).json(successResponse(availableTransitions));
+      const authProfile: AuthTokenPayload = res.locals.authProfile;
+      const response:CatTicketStatuses[] = await this.ticketsService.getAvailableTransitions(ticketId, authProfile);
+      res.status(200).json(successResponse(response));
     } catch (error) {
       const appError = new Error('Failed to retrieve available transitions') as AppError;
       appError.statusCode = 500;

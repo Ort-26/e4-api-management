@@ -17,6 +17,7 @@ export class MasTicketModel
   declare createdAt: Date;
   declare updatedAt: Date;
   declare statusId: number;
+  declare agentId: number | null;
 }
 
 MasTicketModel.init(
@@ -52,6 +53,11 @@ MasTicketModel.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       field: 'status_id',
+    },
+    agentId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'agent_id',
     },
   },
   {

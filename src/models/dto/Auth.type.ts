@@ -1,10 +1,7 @@
 import { JwtPayload } from "jsonwebtoken";
 
-export interface AuthTokenPayload extends JwtPayload {
+export interface AuthTokenPayload extends JwtPayload, AuthenticatedUser {
   sub: string;
-  userId: number;
-  email: string;
-  roleId: number;
   tokenType: 'access' | 'refresh';
 }
 

@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { CatalogsController } from '../controllers/catalogsController';
-import { catalogsRepository } from '../repositories/impl/CatalogsRepository';
+import { container } from '../config/dependencies';
 
 const router = Router();
-const catalogsController = new CatalogsController(catalogsRepository);
+const { catalogsController } = container.controllers;
 
 router.get('/ticket-status', catalogsController.getAllTicketStatuses);
 

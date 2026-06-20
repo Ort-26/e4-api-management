@@ -1,7 +1,7 @@
-import { MasTicket } from "../domain/mas-ticket.type";
-import { TicketComment } from "../dto/TicketComment.type";
+import { CommentDto } from "../dto/CommentDto";
+import { TicketDto } from "../dto/TicketDto";
 
 export interface TicketDetail {
-    ticket: MasTicket;
-    comments: TicketComment[];
+    ticket: TicketDto;
+    comments: CommentDto[];
 } 

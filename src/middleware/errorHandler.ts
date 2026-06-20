@@ -8,18 +8,12 @@ export interface AppError extends Error {
   transactionId?: string;
 }
 
-export const errorHandler = (
-  err: AppError,
-  req: Request,
-  res: Response,
-  _next: NextFunction,
-): void => {
+export const errorHandler = (err: AppError, req: Request, res: Response, _next: NextFunction): void => {
   const statusCode = err.statusCode ?? 500;
   const errorCode = err.errorCode ?? `APP-${statusCode}`;
   const transactionId = err.transactionId ?? randomUUID();
-  const safeMessage = 'An unexpected error occurred. Please contact support.';
-
-  res.locals.errorMessage = `${errorCode}: ${safeMessage}`;
+  const safeMessage = err.message ?? `An unexpected error occurred. Please contact support.`;
+  res.locals.errorMessage = safeMessage;
 
   console.error('[error]', {
     method: req.method,

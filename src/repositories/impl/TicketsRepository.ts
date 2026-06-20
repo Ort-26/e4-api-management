@@ -2,9 +2,13 @@ import { sequelize } from '../../config/sequelize';
 import { MasTicket } from '../../models/domain/mas-ticket.type';
 import { MasComment } from '../../models/domain/mas-comment.type';
 import { MasUser } from '../../models/domain/mas-user.type';
+import { CatRole } from '../../models/domain/cat-role.type';
+import { CatTicketStatuses } from '../../models/domain/cat-ticket-statuses.type';
 import { CreateTicketRequest } from '../../models/request/CreateTicketRequest.type';
-import { TicketComment } from '../../models/dto/TicketComment.type';
+import { CommentDto } from '../../models/dto/CommentDto';
 import { TicketDetail } from '../../models/response/TicketDetail.type';
+import { CatRolesModel } from '../../models/sequelize/CatRolesModel';
+import { CatTicketStatusesModel } from '../../models/sequelize/CatTicketStatusesModel';
 import { MasCommentModel } from '../../models/sequelize/MasCommentModel';
 import { MasTicketModel } from '../../models/sequelize/MasTicketModel';
 import { MasTicketsCommentsModel } from '../../models/sequelize/MasTicketsCommentsModel';
@@ -17,7 +21,32 @@ export class TicketsRepository implements ITicketsRepository {
     this.configureAssociations();
   }
 
+
   private configureAssociations(): void {
+    if (!MasTicketModel.associations.status) {
+      MasTicketModel.belongsTo(CatTicketStatusesModel, {
+        foreignKey: 'statusId',
+        targetKey: 'statusId',
+        as: 'status',
+      });
+    }
+
+    if (!MasTicketModel.associations.agent) {
+      MasTicketModel.belongsTo(MasUserModel, {
+        foreignKey: 'agentId',
+        targetKey: 'userId',
+        as: 'agent',
+      });
+    }
+
+    if (!MasUserModel.associations.role) {
+      MasUserModel.belongsTo(CatRolesModel, {
+        foreignKey: 'roleId',
+        targetKey: 'roleId',
+        as: 'role',
+      });
+    }
+
     if (!MasTicketModel.associations.comments) {
       MasTicketModel.belongsToMany(MasCommentModel, {
         through: MasTicketsCommentsModel,
@@ -45,6 +74,14 @@ export class TicketsRepository implements ITicketsRepository {
     }
   }
 
+  async getTicketById(ticketId: number): Promise<MasTicket | null> {
+    const record = await MasTicketModel.findOne({
+      where: { ticketId },
+    });
+
+    return record ? record.get({ plain: true }) : null;
+  }
+
   async getAllTickets(): Promise<MasTicket[]> {
     const records = await MasTicketModel.findAll({
       order: [['ticketId', 'ASC']],
@@ -53,10 +90,57 @@ export class TicketsRepository implements ITicketsRepository {
     return records.map((record) => record.get({ plain: true }));
   }
 
+  async getTicketsByUserId(userId: number): Promise<MasTicket[]> {
+    const ticketLinks = await MasTicketsUsersModel.findAll({
+      where: { userId },
+      attributes: ['ticketId'],
+    });
+
+    const ticketIds = ticketLinks.map((link) => link.ticketId);
+
+    if (ticketIds.length === 0) {
+      return [];
+    }
+
+    const records = await MasTicketModel.findAll({
+      where: { ticketId: ticketIds },
+      order: [['ticketId', 'ASC']],
+    });
+
+    return records.map((record) => record.get({ plain: true }));
+  }
+
+  async getUserIdsByTicketId(ticketId: number): Promise<number[]> {
+    const ticketLinks = await MasTicketsUsersModel.findAll({
+      where: { ticketId },
+      attributes: ['userId'],
+      order: [['userId', 'ASC']],
+    });
+
+    return ticketLinks.map((link) => link.userId);
+  }
+
   async getTicketDetail(ticketId: number): Promise<TicketDetail | null> {
     const record = await MasTicketModel.findOne({
       where: { ticketId },
       include: [
+        {
+          model: CatTicketStatusesModel,
+          as: 'status',
+          required: false,
+        },
+        {
+          model: MasUserModel,
+          as: 'agent',
+          required: false,
+          include: [
+            {
+              model: CatRolesModel,
+              as: 'role',
+              required: false,
+            },
+          ],
+        },
         {
           model: MasCommentModel,
           as: 'comments',
@@ -67,6 +151,13 @@ export class TicketsRepository implements ITicketsRepository {
               model: MasUserModel,
               as: 'user',
               required: false,
+              include: [
+                {
+                  model: CatRolesModel,
+                  as: 'role',
+                  required: false,
+                },
+              ],
             },
           ],
         },
@@ -74,26 +165,44 @@ export class TicketsRepository implements ITicketsRepository {
       order: [[{ model: MasCommentModel, as: 'comments' }, 'createdAt', 'ASC']],
     });
 
-    if (!record) {
+    if (!record) return null;
+    
+
+    const plain = record.get({ plain: true }) as MasTicket & {
+      status?: CatTicketStatuses;
+      agent?: MasUser & { role?: CatRole };
+      comments?: Array<MasComment & { user?: MasUser & { role?: CatRole } }>;
+    };
+
+    if (!plain.status) {
       return null;
     }
 
-    const plain = record.get({ plain: true }) as MasTicket & {
-      comments?: Array<MasComment & { user?: MasUser }>;
-    };
-
-    const comments: TicketComment[] = (plain.comments ?? [])
-      .filter((comment) => Boolean(comment.user))
+    const comments: CommentDto[] = (plain.comments ?? [])
+      .filter((comment) => Boolean(comment.user) && Boolean(comment.user?.role))
       .map((comment) => ({
-        comment: {
-          commentId: comment.commentId,
-          content: comment.content,
-          commentedBy: comment.commentedBy,
-          createdAt: comment.createdAt,
-          updatedAt: comment.updatedAt,
+        commentId: comment.commentId,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        user: {
+          userId: (comment.user as MasUser).userId,
+          username: (comment.user as MasUser).userName,
+          userLastName: (comment.user as MasUser).userLastname,
+          email: (comment.user as MasUser).email,
+          role: (comment.user as MasUser & { role: CatRole }).role,
         },
-        user: comment.user as MasUser,
       }));
+
+    const agent = plain.agent && plain.agent.role
+      ? {
+          userId: plain.agent.userId,
+          username: plain.agent.userName,
+          userLastName: plain.agent.userLastname,
+          email: plain.agent.email,
+          role: plain.agent.role,
+        }
+      : null;
 
     return {
       ticket: {
@@ -102,7 +211,8 @@ export class TicketsRepository implements ITicketsRepository {
         ticketDesc: plain.ticketDesc,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
-        statusId: plain.statusId,
+        status: plain.status,
+        agent,
       },
       comments,
     };

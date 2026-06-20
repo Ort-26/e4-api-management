@@ -1,11 +1,8 @@
 import { Router } from 'express';
-import { AuthController } from '../controllers/authController';
-import { authRepository } from '../repositories/impl/AuthRepository';
-import { AuthService } from '../services/impl/AuthService';
+import { container } from '../config/dependencies';
 
 const router = Router();
-const authService = new AuthService(authRepository);
-const authController = new AuthController(authService);
+const { authController } = container.controllers;
 
 router.post('/login', authController.login);
 router.post('/refresh', authController.refresh);

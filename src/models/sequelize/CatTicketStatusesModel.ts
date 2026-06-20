@@ -42,7 +42,7 @@ CatTicketStatusesModel.init(
   {
     sequelize,
     modelName: 'CatTicketStatus',
-    tableName: 'cat_ticket_statusess',
+    tableName: 'cat_ticket_statuses',
     timestamps: false,
   },
 );
