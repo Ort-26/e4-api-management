@@ -5,6 +5,7 @@ import { LoginRequest } from '../models/request/LoginRequest.type';
 import { AppError } from '../middleware/errorHandler';
 import { IAuthService } from '../services/interfaces/IAuthService';
 import { successResponse } from '../utils/metadataHelper';
+import { AuthPayload, AuthTokenPayload } from '../models/dto/Auth.type';
 
 export class AuthController {
   constructor(private readonly authService: IAuthService) {}
@@ -60,10 +61,35 @@ export class AuthController {
         return next(this.buildError(401, 'APP-AUTH-401', 'Refresh token not found', res));
       }
 
-      await this.authService.logout(refreshToken);
+      // await this.authService.logout(refreshToken);
       this.clearTokenCookies(res);
 
       res.status(200).json(successResponse({ loggedOut: true }));
+    } catch (error) {
+      next(this.mapAuthError(error, res));
+    }
+  };
+
+  me = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const authProfile = res.locals.authProfile as AuthPayload | undefined;
+
+      if (!authProfile) {
+        return next(this.buildError(401, 'APP-AUTH-401', 'Invalid token', res));
+      }
+
+      res.status(200).json(
+        successResponse({
+          user: {
+            userId: authProfile.userId,
+            userName: authProfile.userName,
+            userLastname: authProfile.userLastname,
+            email: authProfile.email,
+            roleId: authProfile.roleId,
+            permissions: authProfile.permissions,
+          },
+        }),
+      );
     } catch (error) {
       next(this.mapAuthError(error, res));
     }

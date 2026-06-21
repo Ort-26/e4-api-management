@@ -6,33 +6,42 @@ import { AuthResult } from '../../models/response/AuthResult.type';
 import { IAuthRepository } from '../../repositories/interfaces/IAuthRepository';
 import { IAuthService } from '../interfaces/IAuthService';
 import { AuthTokenPayload, AuthUserRecord } from '../../models/dto/Auth.type';
+import { IRolesRepository } from '../../repositories/interfaces/IRolesRepository';
+import { CatPermission } from '../../models/domain/cat-permission.type';
 
 
 export class AuthService implements IAuthService {
-  constructor(private readonly authRepository: IAuthRepository) {}
+  private readonly authRepository: IAuthRepository;
+  private readonly rolesRepository: IRolesRepository;
+
+  constructor(authRepository: IAuthRepository, rolesRepository: IRolesRepository) {
+    this.authRepository = authRepository;
+    this.rolesRepository = rolesRepository;
+  }
 
   async login(payload: LoginRequest): Promise<AuthResult> {
     const user = await this.authRepository.findUserByEmail(payload.email);
     if (!user) throw new Error('AUTH_INVALID_CREDENTIALS');
     await this.validatePassword(user, payload.password);
-    return this.buildAuthResult(user);
+    const permissions: CatPermission[] = await this.rolesRepository.getPermissionsByRoleId(user.roleId);
+    const permissionIds = permissions.map((permission) => permission.permissionId);
+    return this.buildAuthResult(user, permissionIds);
   }
 
   async refresh(refreshToken: string): Promise<AuthResult> {
     const tokenPayload = this.verifyToken(refreshToken, 'refresh');
     const userId = Number(tokenPayload.sub);
-
     if (!Number.isInteger(userId) || userId <= 0) {
       throw new Error('AUTH_INVALID_TOKEN');
     }
-
     const user = await this.authRepository.findUserById(userId);
-
+    
     if (!user) {
       throw new Error('AUTH_INVALID_TOKEN');
     }
-
-    return this.buildAuthResult(user);
+    const permissions: CatPermission[] = await this.rolesRepository.getPermissionsByRoleId(tokenPayload.roleId);
+    const permissionIds = permissions.map((permission) => permission.permissionId);
+    return this.buildAuthResult(user, permissionIds);
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -51,7 +60,7 @@ export class AuthService implements IAuthService {
     }
   }
 
-  private buildAuthResult(user: AuthUserRecord): AuthResult {
+  private buildAuthResult(user: AuthUserRecord, permissions: number[]): AuthResult {
     const basePayload: AuthTokenPayload = {
       sub: String(user.userId),
       userId: user.userId,
@@ -59,7 +68,8 @@ export class AuthService implements IAuthService {
       userLastname: user.userLastname,
       email: user.email,
       roleId: user.roleId,
-      tokenType: 'access',
+      permissions: permissions,
+      tokenType: 'access'
     };
 
     const accessToken = jwt.sign(
@@ -83,6 +93,7 @@ export class AuthService implements IAuthService {
         userLastname: user.userLastname,
         email: user.email,
         roleId: user.roleId,
+        permissions: permissions,
       },
     };
   }

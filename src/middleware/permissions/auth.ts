@@ -61,5 +61,6 @@ const validateTokenPayload = (payload: AuthTokenPayload): AuthTokenPayload | nul
     roleId: payload.roleId,
     sub: payload.sub,
     tokenType: payload.tokenType,
+    permissions: payload.permissions,
   };
 }

@@ -11,6 +11,7 @@ import { IRolesRepository } from '../../repositories/interfaces/IRolesRepository
 import { ITicketsRepository } from '../../repositories/interfaces/ITicketsRepository';
 import { ITicketTransitionsRepository } from '../../repositories/interfaces/ITicketTransitionsRepository';
 import { ITicketsService } from '../interfaces/ITicketsService';
+import { TicketDto } from '../../models/dto/TicketDto';
 
 export class TicketsService implements ITicketsService {
   private ticketsRepository: ITicketsRepository;
@@ -28,14 +29,14 @@ export class TicketsService implements ITicketsService {
     if (!ticketDetail) throw new Error('Ticket not found');
     const permissions: CatPermission[] = await this.rolesRepository.getPermissionsByRoleId(authProfile.roleId);
     const permissionIds = permissions.map(p => p.permissionId);
-    return await this.ticketTransitionsRepository.getAvailableTransitions(ticketDetail.statusId, permissionIds); 
+    return await this.ticketTransitionsRepository.getAvailableTransitions(ticketDetail.status.statusId, permissionIds); 
   }
 
-  async getAllTickets(): Promise<MasTicket[]> {
+  async getAllTickets(): Promise<TicketDto[]> {
     return await this.ticketsRepository.getAllTickets();
   }
 
-  async getTicketsByUserId(userId: number): Promise<MasTicket[]> {
+  async getTicketsByUserId(userId: number): Promise<TicketDto[]> {
     return await this.ticketsRepository.getTicketsByUserId(userId);
   }
 
@@ -66,7 +67,7 @@ export class TicketsService implements ITicketsService {
 
     const permissions: CatPermission[] = await this.rolesRepository.getPermissionsByRoleId(authProfile.roleId);
     const permissionIds = permissions.map((permission) => permission.permissionId);
-    const availableTransitions = await this.ticketTransitionsRepository.getAvailableTransitions(ticket.statusId, permissionIds);
+    const availableTransitions = await this.ticketTransitionsRepository.getAvailableTransitions(ticket.status.statusId, permissionIds);
     const canTransition = availableTransitions.some((status) => status.statusId === statusId);
 
     if (!canTransition) {
@@ -76,9 +77,5 @@ export class TicketsService implements ITicketsService {
     return await this.ticketsRepository.transitionTicketStatus(ticketId, statusId, authProfile.userId);
   }
 
-  async assignAgentToTicket(ticketId: number, agentId: number, authProfile: AuthTokenPayload): Promise<AssignRes | null> {
-    const ticket = await this.ticketsRepository.getTicketById(ticketId);
-    if (!ticket) return null;
-    return await this.ticketsRepository.assignAgentToTicket(ticketId, agentId, authProfile.userId);
-  }
+
 }

@@ -6,3 +6,5 @@ const router = Router();
 const { meController } = container.controllers;
 
 router.get('/tickets', requireAccessToken, meController.getMyTickets);
+
+export default router;

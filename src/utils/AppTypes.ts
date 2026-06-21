@@ -1,12 +1,16 @@
 export const AppTypes = {
     PERMISSIONS: {
         TICKET_CREATE: 1,
-        TICKET_ASSIGN: 2,
-        TICKET_IN_PROGRESS: 3,
-        TICKET_WAIT_CLIENT: 4,
-        TICKET_RESOLVE: 5,
-        TICKET_CLOSE: 6,
-        TICKET_READ_ALL: 7,
-        TICKET_CLOSE_ANY: 8,
+        TICKET_READ_OWN: 2,
+        TICKET_READ_ALL: 3,
+        TICKET_ASSIGN: 4,
+        TICKET_START_PROGRESS: 5,
+        TICKET_REQUEST_CLIENT_INFO: 6,
+        TICKET_CLIENT_RESPOND: 7,
+        TICKET_RESOLVE: 8,
+        TICKET_CLOSE: 9,
+        TICKET_CLOSE_ANY: 10,
+        TICKET_COMMENT: 11,
+        TICKET_REOPEN: 12
     }
 }

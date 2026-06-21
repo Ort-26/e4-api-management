@@ -19,10 +19,37 @@ import { HisAssignationChangeModel } from '../../models/sequelize/HisAssignation
 import { ITicketsRepository } from '../interfaces/ITicketsRepository';
 import { TransitionRes } from '../../models/response/TransitionRes';
 import { AssignRes } from '../../models/response/AssignRes';
+import { TicketDto } from '../../models/dto/TicketDto';
 
 export class TicketsRepository implements ITicketsRepository {
   constructor() {
     this.configureAssociations();
+  }
+
+  private mapTicketToDto(ticket: MasTicket & { status?: CatTicketStatuses; agent?: MasUser & { role?: CatRole } }): TicketDto | null {
+    if (!ticket.status) {
+      return null;
+    }
+
+    const agent = ticket.agent && ticket.agent.role
+      ? {
+          userId: ticket.agent.userId,
+          username: ticket.agent.userName,
+          userLastName: ticket.agent.userLastname,
+          email: ticket.agent.email,
+          role: ticket.agent.role,
+        }
+      : null;
+
+    return {
+      ticketId: ticket.ticketId,
+      ticketTitle: ticket.ticketTitle,
+      ticketDesc: ticket.ticketDesc,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      status: ticket.status,
+      agent,
+    };
   }
 
 
@@ -78,23 +105,78 @@ export class TicketsRepository implements ITicketsRepository {
     }
   }
 
-  async getTicketById(ticketId: number): Promise<MasTicket | null> {
+  async getTicketById(ticketId: number): Promise<TicketDto | null> {
     const record = await MasTicketModel.findOne({
       where: { ticketId },
+      include: [
+        {
+          model: CatTicketStatusesModel,
+          as: 'status',
+          required: false,
+        },
+        {
+          model: MasUserModel,
+          as: 'agent',
+          required: false,
+          include: [
+            {
+              model: CatRolesModel,
+              as: 'role',
+              required: false,
+            },
+          ],
+        },
+      ],
     });
 
-    return record ? record.get({ plain: true }) : null;
+    if (!record) {
+      return null;
+    }
+
+    const plain = record.get({ plain: true }) as MasTicket & {
+      status?: CatTicketStatuses;
+      agent?: MasUser & { role?: CatRole };
+    };
+
+    return this.mapTicketToDto(plain);
   }
 
-  async getAllTickets(): Promise<MasTicket[]> {
+  async getAllTickets(): Promise<TicketDto[]> {
     const records = await MasTicketModel.findAll({
+      include: [
+        {
+          model: CatTicketStatusesModel,
+          as: 'status',
+          required: false,
+        },
+        {
+          model: MasUserModel,
+          as: 'agent',
+          required: false,
+          include: [
+            {
+              model: CatRolesModel,
+              as: 'role',
+              required: false,
+            },
+          ],
+        },
+      ],
       order: [['ticketId', 'ASC']],
     });
 
-    return records.map((record) => record.get({ plain: true }));
+    return records
+      .map((record) => {
+        const plain = record.get({ plain: true }) as MasTicket & {
+          status?: CatTicketStatuses;
+          agent?: MasUser & { role?: CatRole };
+        };
+        return this.mapTicketToDto(plain);
+      })
+      .filter((ticket): ticket is TicketDto => Boolean(ticket));
   }
 
-  async getTicketsByUserId(userId: number): Promise<MasTicket[]> {
+  async getTicketsByUserId(userId: number): Promise<TicketDto[]> {
     const ticketLinks = await MasTicketsUsersModel.findAll({
       where: { userId },
       attributes: ['ticketId'],
@@ -108,10 +190,37 @@ export class TicketsRepository implements ITicketsRepository {
 
     const records = await MasTicketModel.findAll({
       where: { ticketId: ticketIds },
+      include: [
+        {
+          model: CatTicketStatusesModel,
+          as: 'status',
+          required: false,
+        },
+        {
+          model: MasUserModel,
+          as: 'agent',
+          required: false,
+          include: [
+            {
+              model: CatRolesModel,
+              as: 'role',
+              required: false,
+            },
+          ],
+        },
+      ],
       order: [['ticketId', 'ASC']],
     });
 
-    return records.map((record) => record.get({ plain: true }));
+    return records
+      .map((record) => {
+        const plain = record.get({ plain: true }) as MasTicket & {
+          status?: CatTicketStatuses;
+          agent?: MasUser & { role?: CatRole };
+        };
+        return this.mapTicketToDto(plain);
+      })
+      .filter((ticket): ticket is TicketDto => Boolean(ticket));
   }
 
   async getUserIdsByTicketId(ticketId: number): Promise<number[]> {
